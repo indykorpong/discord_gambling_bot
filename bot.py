@@ -49,6 +49,9 @@ async def on_message(msg):
 
         if content[0].lower() == 'bet':
             await user_bet(msg.author, content)
+        
+        if content[0].lower() == 'donate':
+            await user_donate(msg.author, content)
 
         if content[0].lower() == 'result':
             await bet_result(msg.author, content)
@@ -111,6 +114,21 @@ async def user_current(user):
         await print_msg('{0} now has {1} tokens.'.format(user, user_token))
     else:
         await print_msg('{0} has not registered in the system yet.'.format(user))
+
+async def user_donate(user, content):
+    #user receiver amount
+    if user_in_database(user) and user_in_database(content[1]):
+        try:
+            valid_number = await validate_number(content[2], user)
+            if valid_number:
+                token_to_deduct = float(content[2])
+                add_user_token(user, -token_to_deduct)
+                add_user_token(content[1], token_to_deduct)
+        except IndexError:
+            await print_msg('Please enter the valid result or token value to donate.')
+    else:
+        await print_msg('user or receiver has not registered in the system yet.'.format(user))
+
 
 
 async def open_bet():
