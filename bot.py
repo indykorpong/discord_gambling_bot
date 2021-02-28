@@ -4,7 +4,7 @@ import asyncio
 client = discord.Client()
 
 data_filename = 'bot_data/data.txt'
-token_filename = 'token.txt'
+token_filename = 'bot_data/token.txt'
 bet_filename = 'bot_data/bet_state.txt'
 
 token_init = 100
