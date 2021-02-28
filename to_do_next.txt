@@ -1,0 +1,16 @@
+- clear bet dict
+- limit bet value not to exceed user's token
+- can't see bet value
+- must not allow user to bet multiple times
+- must check bet value to be integer
+- implement more states to handle result declaration after the bet phase is closed
+
+- record activity log
+- duel feature
+- encrypt the token data .txt file into .pickle file
+
+coin redeems
+- forcing the coach to play as a player
+- forcing the user to play a certain hero or role 
+  (use different token rate, hero = 20k, role = 10k, also turn off the prediction that match)
+- 

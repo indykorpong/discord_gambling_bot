@@ -27,6 +27,7 @@ async def on_ready():
     print(client.user.name)
     print(client.user.id)
     print('------')
+    await print_msg('IndyBot has come online!', False)
     await wait_for_users()
 
 
@@ -73,7 +74,9 @@ async def wait_for_users():
                     if (user_in_database(user) and
                             not user.voice.channel is None and
                             not user.voice.self_mute and
-                            not user.voice.self_deaf):
+                            not user.voice.self_deaf and
+                            not user.voice.mute and
+                            not user.voice.deaf):
                         add_user_token(user, token_incr_in_vc)
 
                         count += 1
