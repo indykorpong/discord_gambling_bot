@@ -11,7 +11,7 @@ token_init = 100
 token_incr_in_vc = 10
 
 my_guild_id = 203177047441408000
-textchannel_id = 258601727261933568
+text_channel_id = 258601727261933568
 judge_role_id = 813266595291463680
 
 bet_dict = {}
@@ -20,6 +20,8 @@ win_ratio = 2
 
 BET_SIDE, BET_TOKEN, BET_STATE_USER = range(3)
 
+
+# Discord's asynchronous methods
 
 @client.event
 async def on_ready():
@@ -49,21 +51,15 @@ async def on_message(msg):
 
         if content[0].lower() == 'bet':
             await user_bet(msg.author, content)
-        
-        if content[0].lower() == 'donate':
-            await user_donate(msg.author, content)
 
         if content[0].lower() == 'result':
             await bet_result(msg.author, content)
 
+        if content[0].lower() == 'donate':
+            await user_donate(msg.author, content)
 
-async def print_msg(msg, destroy=True):
-    print(msg)
-    msg = '```\n' + msg + '\n```'
-    message = await client.get_channel(textchannel_id).send(msg)
-    if destroy:
-        await message.delete(delay=5.0)
 
+# Main asynchronous methods
 
 async def wait_for_users():
     count = 0
@@ -115,21 +111,6 @@ async def user_current(user):
     else:
         await print_msg('{0} has not registered in the system yet.'.format(user))
 
-async def user_donate(user, content):
-    #user receiver amount
-    if user_in_database(user) and user_in_database(content[1]):
-        try:
-            valid_number = await validate_number(content[2], user)
-            if valid_number:
-                token_to_deduct = float(content[2])
-                add_user_token(user, -token_to_deduct)
-                add_user_token(content[1], token_to_deduct)
-        except IndexError:
-            await print_msg('Please enter the valid result or token value to donate.')
-    else:
-        await print_msg('user or receiver has not registered in the system yet.'.format(user))
-
-
 
 async def open_bet():
     if not get_bet_opened() and not get_prediction_started():
@@ -140,6 +121,15 @@ async def open_bet():
         await close_bet()
     else:
         await print_msg('Bet phase has already closed. :(')
+
+
+async def close_bet():
+    if get_bet_opened() and get_prediction_started():
+        set_bet_opened(False)
+        await print_msg('Bet phase has ended!')
+        await print_bet_dict()
+    else:
+        await print_msg('Prediction has not started yet. :(')
 
 
 async def user_bet(user, content):
@@ -213,13 +203,30 @@ async def bet_result(user, content):
         await print_msg('{0} does not have a Prediction Judge role. :['.format(user))
 
 
-async def close_bet():
-    if get_bet_opened() and get_prediction_started():
-        set_bet_opened(False)
-        await print_msg('Bet phase has ended!')
-        await print_bet_dict()
+async def user_donate(user, content):
+    # $donate <donatee's username> <amount>
+    if user_in_database(user) and user_in_database(content[1]):
+        try:
+            valid_number = await validate_number(content[2], user)
+            if valid_number:
+                token_to_deduct = float(content[2])
+                add_user_token(user, -token_to_deduct)
+                add_user_token(content[1], token_to_deduct)
+                await print_msg('{0} has donated {1} for {2} tokens!'.format(user, content[1], float(content[2])))
+        except IndexError:
+            await print_msg("Please enter the valid donatee's username or token value to donate.")
     else:
-        await print_msg('Prediction has not started yet. :(')
+        await print_msg('The donor or donatee has not registered in the system yet.'.format(user))
+
+
+# Helper asynchronous methods
+
+async def print_msg(msg, destroy=True):
+    print(msg)
+    msg = '```\n' + msg + '\n```'
+    message = await client.get_channel(text_channel_id).send(msg)
+    if destroy:
+        await message.delete(delay=5.0)
 
 
 async def validate_number(string, user):
@@ -228,7 +235,8 @@ async def validate_number(string, user):
         if min_bet_tokens <= number <= user_current_tokens(user):
             return True
         else:
-            await print_msg('Please insert the valid number of tokens according to your current tokens or minimum requirement (10 tokens).')
+            await print_msg(
+                'Please insert the valid number of tokens according to your current tokens or minimum requirement (10 tokens).')
             return False
     except ValueError:
         if string != 'all':
@@ -249,6 +257,8 @@ async def print_bet_dict():
                                                                       bet_dict[user][BET_SIDE],
                                                                       bet_dict[user][BET_TOKEN]), False)
 
+
+# Synchronous methods
 
 def get_voice_channels():
     for guild in client.guilds:
@@ -360,8 +370,8 @@ def get_prediction_started():
 
 def set_prediction_state(value):
     with open(bet_filename, 'r') as f:
-            lines = f.readlines()
-            tmp = lines[0]
+        lines = f.readlines()
+        tmp = lines[0]
 
     with open(bet_filename, 'w') as f:
         try:
@@ -373,6 +383,8 @@ def set_prediction_state(value):
         except ValueError:
             print('Invalid bet_opened value!')
 
+
+# Call main
 
 if __name__ == '__main__':
     TOKEN = read_app_token()
