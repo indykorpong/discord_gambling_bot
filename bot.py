@@ -1,7 +1,9 @@
 import discord
 import asyncio
 
-client = discord.Client()
+from discord.ext import commands
+
+bot = commands.Bot(command_prefix='$')
 
 data_filename = 'bot_data/data.txt'
 token_filename = 'bot_data/token.txt'
@@ -23,40 +25,14 @@ BET_SIDE, BET_TOKEN, BET_STATE_USER = range(3)
 
 # Discord's asynchronous methods
 
-@client.event
+@bot.event
 async def on_ready():
     print('Logged in as')
-    print(client.user.name)
-    print(client.user.id)
+    print(bot.user.name)
+    print(bot.user.id)
     print('------')
-    await print_msg('IndyBot has come online!', False)
+    await print_msg('IndyBot has come online!', destroy=False)
     await wait_for_users()
-
-
-@client.event
-async def on_message(msg):
-    if '$' in msg.content[0].lower():
-        content = msg.content[1:].strip().split(' ')
-        if content[0].lower() == 'apply':
-            await user_register(msg.author, token_init)
-
-        if content[0].lower() == 'current':
-            await user_current(msg.author)
-
-        if content[0].lower() == 'bet.open':
-            await open_bet()
-
-        if content[0].lower() == 'bet.close':
-            await close_bet()
-
-        if content[0].lower() == 'bet':
-            await user_bet(msg.author, content)
-
-        if content[0].lower() == 'result':
-            await bet_result(msg.author, content)
-
-        if content[0].lower() == 'donate':
-            await user_donate(msg.author, content)
 
 
 # Main asynchronous methods
@@ -86,9 +62,12 @@ async def wait_for_users():
         await asyncio.sleep(60)
 
 
-async def user_register(user, token):
+@bot.command()
+async def apply(ctx: commands.Context):
     has_registered = False
 
+    user = ctx.author
+    token = token_init
     print('{0} has registered in the betting system'.format(user))
     print('{0} has earned {1} tokens'.format(user, token))
 
@@ -104,26 +83,32 @@ async def user_register(user, token):
             await print_msg('{0} has earned {1} tokens.'.format(user, token))
 
 
-async def user_current(user):
+@bot.command()
+async def current(ctx: commands.Context):
+    user = ctx.author
+    print(user)
     if user_in_database(user):
         user_token = user_current_tokens(user)
         await print_msg('{0} now has {1} tokens.'.format(user, user_token))
+        await discord.Message.delete(ctx.message, delay=4.0)
     else:
         await print_msg('{0} has not registered in the system yet.'.format(user))
 
 
-async def open_bet():
+@bot.command()
+async def bet_open(ctx: commands.Context):
     if not get_bet_opened() and not get_prediction_started():
         set_bet_opened(True)
         set_prediction_state(True)
         await print_msg('Prediction and bet phase have started!')
         await asyncio.sleep(360)
-        await close_bet()
+        await bet_close(ctx)
     else:
         await print_msg('Bet phase has already closed. :(')
 
 
-async def close_bet():
+@bot.command()
+async def bet_close(ctx: commands.Context):
     if get_bet_opened() and get_prediction_started():
         set_bet_opened(False)
         await print_msg('Bet phase has ended!')
@@ -132,7 +117,8 @@ async def close_bet():
         await print_msg('Prediction has not started yet. :(')
 
 
-async def user_bet(user, content):
+@bot.command()
+async def bet(ctx: commands.Context, bet_side, token):
     if not get_prediction_started():
         await print_msg('Prediction has not started yet. :(')
         return
@@ -141,28 +127,29 @@ async def user_bet(user, content):
         await print_msg('Bet phase has already closed. :(')
         return
 
+    user = ctx.author
     if user_in_database(user):
         try:
-            valid_number = await validate_number(content[2], user)
+            valid_number = await validate_number(str(token), user)
             valid_bet_state = await validate_bet_state(user)
             print(valid_number, valid_bet_state)
 
             can_bet = False
             if valid_number and valid_bet_state:
-                token_to_deduct = float(content[2])
+                token_to_deduct = float(token)
                 can_bet = True
 
             elif not valid_number and valid_bet_state:
-                if content[2].lower() == 'all':
+                if token.lower() == 'all':
                     token_to_deduct = user_current_tokens(user)
                     can_bet = True
 
             if can_bet:
-                if content[1].lower() == 'win':
+                if bet_side.lower() == 'win':
                     bet_dict[str(user)] = ('win', token_to_deduct, True)
                     add_user_token(user, -token_to_deduct)
                     await print_msg('{0} has chosen to be the believers!'.format(user))
-                elif content[1].lower() == 'loss' or content[1].lower() == 'lose':
+                elif bet_side.lower() == 'loss' or bet_side.lower() == 'lose':
                     bet_dict[str(user)] = ('loss', token_to_deduct, True)
                     add_user_token(user, -token_to_deduct)
                     await print_msg('{0} has chosen to be the doubters!'.format(user))
@@ -175,20 +162,27 @@ async def user_bet(user, content):
         await print_msg('{0} has not registered in the system yet.'.format(user))
 
 
-async def bet_result(user, content):
+@bot.command()
+async def result(ctx: commands.Context, bet_result):
     if not get_prediction_started():
         await print_msg('Prediction has not started yet. :(')
         return
 
+    user = ctx.author
+
     if user_is_judge(user):
         try:
-            result = ''
-            if content[1].lower() == 'win':
-                result = 'win'
-            elif content[1].lower() == 'loss' or content[1].lower() == 'lose':
-                result = 'loss'
+            _result = ''
+            if bet_result.lower() == 'win':
+                _result = 'win'
+            elif bet_result.lower() == 'loss' or bet_result.lower() == 'lose':
+                _result = 'loss'
+            # elif bet_result.lower() == 'na':
+            #     _result = 'na'
+            # TODO: handle the case where the result is N/A (not applicable)
+
             for user in bet_dict.keys():
-                if bet_dict[user][BET_SIDE] == result:
+                if bet_dict[user][BET_SIDE] == _result:
                     add_user_token(user, float(bet_dict[user][BET_TOKEN] * win_ratio))
                     await print_msg('{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * win_ratio))
                 else:
@@ -203,20 +197,25 @@ async def bet_result(user, content):
         await print_msg('{0} does not have a Prediction Judge role. :['.format(user))
 
 
-async def user_donate(user, content):
+@bot.command()
+async def donate(ctx: commands.Context, donatee: discord.Member, donate_amount):
     # $donate <donatee's username> <amount>
-    if user_in_database(user) and user_in_database(content[1]):
+    user = ctx.author
+    donatee_user = get_user_from_user_id(donatee.id)
+    print(donatee.id, donatee_user)
+
+    if user_in_database(user) and user_in_database(donatee_user):
         try:
-            valid_number = await validate_number(content[2], user)
+            valid_number = await validate_number(donate_amount, user)
             if valid_number:
-                token_to_deduct = float(content[2])
+                token_to_deduct = float(donate_amount)
                 add_user_token(user, -token_to_deduct)
-                add_user_token(content[1], token_to_deduct)
-                await print_msg('{0} has donated {1} for {2} tokens!'.format(user, content[1], float(content[2])))
+                add_user_token_by_id(donatee.id, token_to_deduct)
+                await print_msg('{0} has donated {1} for {2} tokens!'.format(user, donatee_user, donate_amount))
         except IndexError:
             await print_msg("Please enter the valid donatee's username or token value to donate.")
     else:
-        await print_msg('The donor or donatee has not registered in the system yet.'.format(user))
+        await print_msg('The donor or donatee has not registered in the system yet.')
 
 
 # Helper asynchronous methods
@@ -224,7 +223,7 @@ async def user_donate(user, content):
 async def print_msg(msg, destroy=True):
     print(msg)
     msg = '```\n' + msg + '\n```'
-    message = await client.get_channel(text_channel_id).send(msg)
+    message = await bot.get_channel(text_channel_id).send(msg)
     if destroy:
         await message.delete(delay=5.0)
 
@@ -261,7 +260,7 @@ async def print_bet_dict():
 # Synchronous methods
 
 def get_voice_channels():
-    for guild in client.guilds:
+    for guild in bot.guilds:
         if guild.id == my_guild_id:
             voice_channels = guild.voice_channels
             return voice_channels
@@ -269,7 +268,7 @@ def get_voice_channels():
 
 
 def get_guild():
-    for guild in client.guilds:
+    for guild in bot.guilds:
         if guild.id == my_guild_id:
             return guild
     return None
@@ -296,6 +295,21 @@ def add_user_token(user, token):
                 f.write('{0}:{1}:{2}\n'.format(line_user, line_user_id, line_token))
 
 
+def add_user_token_by_id(user_id, token):
+    with open(data_filename, 'r') as f:
+        lines = f.readlines()
+
+    with open(data_filename, 'w') as f:
+        for line in lines:
+            line = line.strip(' \n')
+            if ':' in line:
+                line_user, line_user_id, line_token = line.split(':')
+                if str(line_user_id) == str(user_id):
+                    line_token = str(float(line_token) + float(token))
+                    print('edit {0}:{1}:{2}'.format(line_user, line_user_id, line_token))
+                f.write('{0}:{1}:{2}\n'.format(line_user, line_user_id, line_token))
+
+
 def user_in_database(user):
     with open(data_filename, 'r') as f:
         for line in f:
@@ -305,6 +319,17 @@ def user_in_database(user):
                 if str(line_user) == str(user):
                     return True
     return False
+
+
+def get_user_from_user_id(user_id):
+    with open(data_filename, 'r') as f:
+        for line in f:
+            line = line.strip(' \n')
+            if ':' in line:
+                line_user, line_user_id, line_token = line.split(':')
+                if str(line_user_id) == str(user_id):
+                    return line_user
+    return None
 
 
 def user_current_tokens(user):
@@ -388,4 +413,4 @@ def set_prediction_state(value):
 
 if __name__ == '__main__':
     TOKEN = read_app_token()
-    client.run(TOKEN)
+    bot.run(TOKEN)
