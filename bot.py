@@ -84,6 +84,10 @@ async def apply(ctx: commands.Context):
 
 
 @bot.command()
+async def help(ctx: commands.Context):
+    await print_msg('''$apply\n\t#apply for a life of eternal gamba hell, gaining 10 tokens per minute for use in sating your gambling addiction.\n\n$current\n\t#show an exact amount of your current tokens.\n\n$bet_open\n\t#open a gamba game that can lead you into bankruptcy. Normally a gamba game will open for 6 mins before it’s closed unless bet_close command is issued.\n\n$bet_close\n\t#you can use this command to manually close a gamba game and wait for a privileged dude to announce the result.\n\n$bet <bet_result> <token_amount/all>\n\t#choose to become believers or doubters with some tokens that can motivate players’ movement in game. (<bet_result> includes win, loss, lose) Ex. bet loss all   \n\n$result <bet_result>\n\t#for privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. result loss\n\n$donate <donatee> <token_amount/all>\n\t#donate your tokens to an unfortunate investor in need of spare tokens. Ex. donate @Indykuma 322''')
+
+@bot.command()
 async def current(ctx: commands.Context):
     user = ctx.author
     print(user)
