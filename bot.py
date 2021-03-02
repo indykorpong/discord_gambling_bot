@@ -3,7 +3,7 @@ import asyncio
 
 from discord.ext import commands
 
-bot = commands.Bot(command_prefix='$')
+bot = commands.Bot(command_prefix='$', help_command=None)
 
 data_filename = 'bot_data/data.txt'
 token_filename = 'bot_data/token.txt'
@@ -45,7 +45,6 @@ async def wait_for_users():
         if voice_channels is not None:
             for vc in voice_channels:
                 for user in vc.members:
-                    print(user)
                     if (user_in_database(user) and
                             not user.voice.channel is None and
                             not user.voice.self_mute and
@@ -85,7 +84,27 @@ async def apply(ctx: commands.Context):
 
 @bot.command()
 async def help(ctx: commands.Context):
-    await print_msg('''$apply\n\t#apply for a life of eternal gamba hell, gaining 10 tokens per minute for use in sating your gambling addiction.\n\n$current\n\t#show an exact amount of your current tokens.\n\n$bet_open\n\t#open a gamba game that can lead you into bankruptcy. Normally a gamba game will open for 6 mins before it’s closed unless bet_close command is issued.\n\n$bet_close\n\t#you can use this command to manually close a gamba game and wait for a privileged dude to announce the result.\n\n$bet <bet_result> <token_amount/all>\n\t#choose to become believers or doubters with some tokens that can motivate players’ movement in game. (<bet_result> includes win, loss, lose) Ex. bet loss all   \n\n$result <bet_result>\n\t#for privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. result loss\n\n$donate <donatee> <token_amount/all>\n\t#donate your tokens to an unfortunate investor in need of spare tokens. Ex. donate @Indykuma 322''')
+    await print_msg(
+        '''Command List:\n\n
+    $apply\n
+      - Apply for a life of eternal gamba hell, gaining 10 tokens per minute for use in sating your gambling addiction.\n\n 
+    $current\n
+      - Show an exact amount of your current tokens.\n\n
+    $bet_open\n
+      - Open a gamba game that can lead you into bankruptcy. Normally a gamba game will open for 6 mins before it’s closed unless bet_close command is issued.\n\n
+    $bet_close\n
+      - You can use this command to manually close a gamba game and wait for a privileged dude to announce the result.\n\n
+    $bet <bet_result> <token_amount/all>\n
+      - Choose to become believers or doubters with some tokens that can motivate players’ movement in game. (<bet_result> includes win, loss, lose) Ex. bet loss all \n\n
+    $result <bet_result>\n
+      - For privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. result loss\n\n
+    $donate <donatee> <token_amount/all>\n 
+      - Donate your tokens to an unfortunate investor in need of spare tokens. Ex. donate @IndyKumaz 322
+        ''',
+        destroy=True,
+        delay=60.0)
+    await discord.Message.delete(ctx.message, delay=4.0)
+
 
 @bot.command()
 async def current(ctx: commands.Context):
@@ -211,8 +230,15 @@ async def donate(ctx: commands.Context, donatee: discord.Member, donate_amount):
     if user_in_database(user) and user_in_database(donatee_user):
         try:
             valid_number = await validate_number(donate_amount, user)
+            donated = False
             if valid_number:
                 token_to_deduct = float(donate_amount)
+                donated = True
+            else:
+                if donate_amount.lower() == 'all':
+                    token_to_deduct = user_current_tokens(user)
+                    donated = True
+            if donated:
                 add_user_token(user, -token_to_deduct)
                 add_user_token_by_id(donatee.id, token_to_deduct)
                 await print_msg('{0} has donated {1} for {2} tokens!'.format(user, donatee_user, donate_amount))
@@ -222,14 +248,19 @@ async def donate(ctx: commands.Context, donatee: discord.Member, donate_amount):
         await print_msg('The donor or donatee has not registered in the system yet.')
 
 
+# @bot.command()
+# async def redeem(ctx: commands.Context, *args):
+#
+
+
 # Helper asynchronous methods
 
-async def print_msg(msg, destroy=True):
+async def print_msg(msg, destroy=True, delay=5.0):
     print(msg)
     msg = '```\n' + msg + '\n```'
     message = await bot.get_channel(text_channel_id).send(msg)
     if destroy:
-        await message.delete(delay=5.0)
+        await message.delete(delay=delay)
 
 
 async def validate_number(string, user):
