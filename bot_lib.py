@@ -190,35 +190,36 @@ async def bot_donate(ctx: commands.Context, bot: commands.Bot, donatee: discord.
             if valid_number:
                 token_to_deduct = float(donate_amount)
                 donated = True
-            else:
-                if donate_amount.lower() == 'all':
-                    token_to_deduct = user_current_tokens(user)
-                    donated = True
+            elif donate_amount.lower() == 'all':
+                token_to_deduct = user_current_tokens(user)
+                donated = True
+
             if donated:
                 add_user_token(user, -token_to_deduct)
                 add_user_token_by_id(donatee.id, token_to_deduct)
-                await print_msg(bot, '{0} has donated {1} for {2} tokens!'.format(user, donatee_user, donate_amount))
+                await print_msg(bot, '{0} has donated {1} for {2} tokens!'.format(user, donatee_user, token_to_deduct))
         except IndexError:
             await print_msg("Please enter the valid donatee's username or token value to donate.")
     else:
         await print_msg(bot, 'The donor or donatee has not registered in the system yet.')
 
 
-async def bot_duel(ctx: commands.Context, bot: commands.Bot, user: discord.Member, tokens: float):
+async def bot_duel(ctx: commands.Context, bot: commands.Bot, user: discord.Member, tokens):
     challengee = get_user_from_user_id(user.id)
     if not user_in_database(challengee):
-        await print_msg(bot, 'Cannot duel with {0} because they are not in the system.'.format(challengee))
+        await print_msg(bot, 'Cannot duel with {0} because they are not in the system.'.format(user))
     else:
         try:
-            duel_amount = float(tokens)
-            if duel_amount > user_current_tokens(ctx.author):
-                await print_msg(bot, 'You do not have enough tokens to duel.')
-            elif duel_amount > user_current_tokens(challengee):
-                await print_msg(bot, 'Your challengee does not have enough tokens to duel.')
+            if validate_number(bot, tokens, ctx.author, False):
+                if validate_number(bot, tokens, challengee, False):
+                    duel_amount = float(tokens)
+                    duel_dict[challengee] = [str(ctx.author), duel_amount]
+                    await print_msg(bot, '{0} has challenged {1} to duel for {2} tokens.'.format(ctx.author, challengee,
+                                                                                                 duel_amount))
+                else:
+                    await print_msg(bot, 'Your challengee does not have enough tokens to duel.')
             else:
-                duel_dict[challengee] = [str(ctx.author), duel_amount]
-                await print_msg(
-                    '{0} has challenged {1} to duel for {2} tokens.'.format(ctx.author, challengee, duel_amount))
+                await print_msg(bot, 'You do not have enough tokens to duel.')
         except ValueError:
             await print_msg(bot, 'Please enter the valid amount of tokens to duel.')
 
@@ -232,10 +233,12 @@ async def bot_duel_accept(ctx: commands.Context, bot: commands.Bot):
             await print_msg(bot, '{0} has won the duel.'.format(challengee))
             add_user_token(challengee, duel_dict[challengee][DUEL_AMOUNT])
             add_user_token(challenger, -duel_dict[challengee][DUEL_AMOUNT])
+            duel_dict.pop(challengee)
         else:
             await print_msg(bot, '{0} has won the duel.'.format(challenger))
             add_user_token(challengee, -duel_dict[challengee][DUEL_AMOUNT])
             add_user_token(challenger, duel_dict[challengee][DUEL_AMOUNT])
+            duel_dict.pop(challengee)
     else:
         await print_msg(bot, 'You have not been challenged.')
 
@@ -277,18 +280,20 @@ async def print_msg(bot: commands.Bot, msg, destroy=True, delay=5.0):
         await message.delete(delay=delay)
 
 
-async def validate_number(bot: commands.Bot, string, user):
+async def validate_number(bot: commands.Bot, string, user, printed=True):
     try:
         number = float(string)
         if min_bet_tokens <= number <= user_current_tokens(user):
             return True
         else:
-            await print_msg(bot,
-                            'Please insert the valid number of tokens according to your current tokens or minimum requirement (10 tokens).')
+            if printed:
+                await print_msg(bot,
+                                'Please insert the valid number of tokens according to your current tokens or minimum requirement (10 tokens).')
             return False
     except ValueError:
         if string != 'all':
-            await print_msg(bot, 'Please insert the valid number of tokens to bet.')
+            if printed:
+                await print_msg(bot, 'Please insert the valid number of tokens to bet.')
         return False
 
 
