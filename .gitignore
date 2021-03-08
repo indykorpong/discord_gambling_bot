@@ -1,2 +1,4 @@
 bot_data/*
 nohup.out
+venv/*
+.idea/*
