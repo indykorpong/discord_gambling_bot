@@ -1,4 +1,4 @@
-from bot_lib import *
+from bot_main import *
 
 bot = commands.Bot(command_prefix='$', help_command=None)
 
@@ -34,7 +34,7 @@ async def current(ctx: commands.Context):
 
 @bot.command()
 async def bet_open(ctx: commands.Context):
-    await bot_bet_open(ctx, bot)
+    await bot_bet_open(bot)
 
 
 @bot.command()
