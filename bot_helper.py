@@ -1,4 +1,5 @@
 import os
+import discord
 
 from discord.ext import commands
 from datetime import datetime
@@ -26,7 +27,7 @@ async def print_msg(bot: commands.Bot, msg, destroy=True, delay=5.0):
         await message.delete(delay=delay)
 
 
-async def validate_token_amount(bot: commands.Bot, string, user, printed=True):
+async def validate_token_amount(bot: commands.Bot, string: str, user, printed=True):
     try:
         number = float(string)
         if min_bet_tokens <= number <= user_current_tokens(user):
@@ -87,7 +88,7 @@ def add_user_token(user, token):
                 line_user, line_user_id, line_token = line.split(':')
                 if str(line_user) == str(user):
                     line_token = str(float(line_token) + float(token))
-                    record_log('edit {0}:{1}:{2}'.format(line_user, line_user_id, line_token))
+                    # record_log('edit {0}:{1}:{2}'.format(line_user, line_user_id, line_token))
                 f.write('{0}:{1}:{2}\n'.format(line_user, line_user_id, line_token))
 
 

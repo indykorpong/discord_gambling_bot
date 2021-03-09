@@ -1,4 +1,3 @@
-import discord
 import random
 import asyncio
 
@@ -15,11 +14,12 @@ token_over_time = 2
 my_guild_id = 203177047441408000
 text_channel_id = 258601727261933568
 judge_role_id = 813266595291463680
+bot_id = 249925410819670016
 
 bet_dict = {}
+bet_pool_dict = {}
 duel_dict = {}
 min_bet_tokens = 10
-win_ratio = 2
 
 BET_SIDE, BET_TOKEN, BET_STATE_USER = range(3)
 DUEL_CHALLENGER, DUEL_AMOUNT = range(2)
@@ -29,23 +29,32 @@ DUEL_CHALLENGER, DUEL_AMOUNT = range(2)
 
 # Bot's main asynchronous methods
 async def bot_apply(ctx: commands.Context, bot: commands.Bot):
+    user = ctx.author
+    user_apply(user, bot)
+
+
+async def user_apply(user: discord.Member, bot: commands.Bot, is_bot=False):
+    token = token_init
     has_registered = False
 
-    user = ctx.author
-    token = token_init
-    record_log('{0} has registered in the betting system'.format(user))
-    record_log('{0} has earned {1} tokens'.format(user, token))
-
-    if user_in_database(user):
+    if user_in_database(user) and not is_bot:
         has_registered = True
         await print_msg(bot, '{0} has already registered!'.format(str(user)))
 
+    if user_in_database(user) and is_bot:
+        has_registered = True
+
     with open(data_filename, 'a') as f:
-        if not has_registered:
+        if not has_registered and not is_bot:
             await print_msg(bot, '{0} has registered in the betting system.'.format(user))
 
             f.write('{0}:{1}:{2}\n'.format(user, user.id, token))
             await print_msg(bot, '{0} has earned {1} tokens.'.format(user, token))
+        if not has_registered and is_bot:
+            record_log('{0} has registered in the betting system.'.format(user))
+
+            f.write('{0}:{1}:{2}\n'.format(user, user.id, token))
+            record_log('{0} has earned {1} tokens.'.format(user, token))
 
 
 async def bot_help(ctx: commands.Context, bot: commands.Bot):
@@ -85,6 +94,8 @@ async def bot_bet_open(bot: commands.Bot):
     if not get_bet_opened() and not get_prediction_started():
         set_bet_opened(True)
         set_prediction_state(True)
+        bet_pool_dict['win'] = 0
+        bet_pool_dict['lose'] = 0
         await print_msg(bot, 'Prediction and bet phase have started!')
         await asyncio.sleep(360)
         await bot_bet_close(bot)
@@ -95,6 +106,20 @@ async def bot_bet_open(bot: commands.Bot):
 async def bot_bet_close(bot: commands.Bot):
     if get_bet_opened() and get_prediction_started():
         set_bet_opened(False)
+        # Bot has to bet if there's no bet on one side (either win or lose).
+        bot_user = get_user_from_user_id(bot_id)
+        bot_current_tokens = user_current_tokens(bot_user)
+        if bet_pool_dict['win'] == 0 and bet_pool_dict['lose'] > 0:
+            if bot_current_tokens >= bet_pool_dict['lose']:
+                await user_bet(bot_user, bot, 'win', bet_pool_dict['lose'])
+            else:
+                await user_bet(bot_user, bot, 'win', bot_current_tokens)
+        if bet_pool_dict['lose'] == 0 and bet_pool_dict['win'] > 0:
+            if bot_current_tokens >= bet_pool_dict['win']:
+                await user_bet(bot_user, bot, 'lose', bet_pool_dict['win'])
+            else:
+                await user_bet(bot_user, bot, 'lose', bot_current_tokens)
+
         await print_msg(bot, 'Bet phase has ended!')
         await print_bet_dict(bot)
     else:
@@ -111,6 +136,10 @@ async def bot_bet(ctx: commands.Context, bot: commands.Bot, bet_side, token):
         return
 
     user = ctx.author
+    await user_bet(user, bot, bet_side, token)
+
+
+async def user_bet(user: discord.Member, bot: commands.Bot, bet_side, token):
     token_to_deduct = 0.0
     if user_in_database(user):
         try:
@@ -129,10 +158,12 @@ async def bot_bet(ctx: commands.Context, bot: commands.Bot, bet_side, token):
             if can_bet:
                 if bet_side.lower() == 'win':
                     bet_dict[str(user)] = ('win', token_to_deduct, True)
+                    bet_pool_dict['win'] += token_to_deduct
                     add_user_token(user, -token_to_deduct)
                     await print_msg(bot, '{0} has chosen to be the believers!'.format(user))
                 elif bet_side.lower() == 'loss' or bet_side.lower() == 'lose':
                     bet_dict[str(user)] = ('loss', token_to_deduct, True)
+                    bet_pool_dict['lose'] += token_to_deduct
                     add_user_token(user, -token_to_deduct)
                     await print_msg(bot, '{0} has chosen to be the doubters!'.format(user))
                 else:
@@ -150,6 +181,10 @@ async def bot_result(ctx: commands.Context, bot: commands.Bot, bet_result):
         return
 
     user = ctx.author
+    win_ratio = (bet_pool_dict['win'] + bet_pool_dict['lose']) / bet_pool_dict['win']
+    loss_ratio = (bet_pool_dict['win'] + bet_pool_dict['lose']) / bet_pool_dict['lose']
+    record_log('Win ratio is 1 : {0}.'.format(win_ratio))
+    record_log('Loss ratio is 1 : {0}.'.format(loss_ratio))
 
     if user_is_judge(user):
         try:
@@ -164,13 +199,20 @@ async def bot_result(ctx: commands.Context, bot: commands.Bot, bet_result):
 
             for user in bet_dict.keys():
                 if bet_dict[user][BET_SIDE] == _result:
-                    add_user_token(user, float(bet_dict[user][BET_TOKEN] * win_ratio))
-                    await print_msg(bot, '{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * win_ratio))
+                    if _result == 'win':
+                        add_user_token(user, float(bet_dict[user][BET_TOKEN] * win_ratio))
+                        await print_msg(bot,
+                                        '{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * win_ratio))
+                    elif _result == 'loss':
+                        add_user_token(user, float(bet_dict[user][BET_TOKEN] * loss_ratio))
+                        await print_msg(bot,
+                                        '{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * loss_ratio))
                 else:
                     await print_msg(bot, '{0} has wasted {1} tokens.'.format(user, bet_dict[user][BET_TOKEN]))
             set_bet_opened(False)
             set_prediction_state(False)
             bet_dict.clear()
+            bet_pool_dict.clear()
             await print_msg(bot, 'Prediction has ended.')
         except IndexError:
             await print_msg(bot, 'Please enter the valid result.')
@@ -185,7 +227,7 @@ async def bot_donate(ctx: commands.Context, bot: commands.Bot, donatee: discord.
     donatee_user = get_user_from_user_id(donatee.id)
     if user_in_database(user) and user_in_database(donatee_user):
         try:
-            valid_number = await validate_token_amount(bot, donate_amount, user)
+            valid_number = await validate_token_amount(bot, str(donate_amount), user)
             donated = False
             if valid_number:
                 token_to_deduct = float(donate_amount)
@@ -210,16 +252,28 @@ async def bot_duel(ctx: commands.Context, bot: commands.Bot, user: discord.Membe
         await print_msg(bot, 'Cannot duel with {0} because they are not in the system.'.format(user))
     else:
         try:
-            if validate_token_amount(bot, tokens, ctx.author, False):
-                if validate_token_amount(bot, tokens, challengee, False):
-                    duel_amount = float(tokens)
-                    duel_dict[challengee] = [str(ctx.author), duel_amount]
-                    await print_msg(bot, '{0} has challenged {1} to duel for {2} tokens.'.format(ctx.author, challengee,
-                                                                                                 duel_amount))
-                else:
+            print(tokens)
+            valid_challenger_amount = await validate_token_amount(bot, str(tokens), ctx.author, False)
+            valid_challengee_amount = await validate_token_amount(bot, str(tokens), challengee, False)
+            valid_duel = False
+            if valid_challenger_amount and valid_challengee_amount:
+                duel_amount = float(tokens)
+                valid_duel = True
+            elif tokens.lower() == 'all':
+                duel_amount = user_current_tokens(ctx.author)
+                valid_challengee_amount = validate_token_amount(bot, str(duel_amount), challengee)
+                if not valid_challengee_amount:
                     await print_msg(bot, 'Your challengee does not have enough tokens to duel.')
-            else:
-                await print_msg(bot, 'You do not have enough tokens to duel.')
+            elif not valid_challenger_amount:
+                await print_msg(bot, 'You do not have enough tokens to duel or you inserted an invalid amount of tokens.')
+            elif not valid_challengee_amount:
+                await print_msg(bot, 'Your challengee does not have enough tokens to duel or you inserted an invalid amount of tokens.')
+
+            if valid_duel:
+                duel_dict[challengee] = [str(ctx.author), duel_amount]
+                await print_msg(bot, '{0} has challenged {1} to duel for {2} tokens.'.format(ctx.author, challengee,
+                                                                                             duel_amount))
+
         except ValueError:
             await print_msg(bot, 'Please enter the valid amount of tokens to duel.')
 
@@ -252,6 +306,10 @@ async def bot_duel_decline(ctx: commands.Context, bot: commands.Bot):
 
 # Helper asynchronous methods
 async def wait_for_users(bot: commands.Bot):
+    # If the bot has not applied for the system yet, then let the bot apply.
+    bot_user = get_user_from_user_id(bot_id)
+    if bot_user is None:
+        await user_apply(bot.user, bot, True)
     while True:
         voice_channels = get_voice_channels(bot)
         if voice_channels is not None:
@@ -268,6 +326,7 @@ async def wait_for_users(bot: commands.Bot):
                     else:
                         record_log('{0} is not in database or not in compatible voice condition'.format(user))
 
+        add_user_token_by_id(bot_id, token_over_time)
         await asyncio.sleep(60)
 
 

@@ -63,7 +63,7 @@ async def donate(ctx: commands.Context, donatee: discord.Member, donate_amount):
 
 
 @bot.command()
-async def duel(ctx: commands.Context, user: discord.Member, tokens: float):
+async def duel(ctx: commands.Context, user: discord.Member, tokens):
     await bot_duel(ctx, bot, user, tokens)
 
 
