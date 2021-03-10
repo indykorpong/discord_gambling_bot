@@ -57,8 +57,8 @@ async def donate(ctx: commands.Context, donatee: discord.Member, donate_amount):
     await bot_donate(ctx, bot, donatee, donate_amount)
 
 
-# @bot.command()
-# async def redeem(ctx: commands.Context, *args):
+@bot.command()
+async def redeem_1(ctx: commands.Context, coach: discord.Member,):
 #
 
 
@@ -76,6 +76,9 @@ async def duel_accept(ctx: commands.Context):
 async def duel_decline(ctx: commands.Context):
     await bot_duel_decline(ctx, bot)
 
+@bot.command()
+async def redeem(ctx: commands.Context, num, coach: discord.Member):
+    await bot_redeem()
 
 # Synchronous methods
 

@@ -73,12 +73,31 @@ async def bot_help(ctx: commands.Context, bot: commands.Bot):
     $result <bet_result>\n
       - For privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. result loss\n\n
     $donate <donatee> <token_amount/all>\n 
-      - Donate your tokens to an unfortunate investor in need of spare tokens. Ex. donate @IndyKumaz 322
-        ''',
+      - Donate your tokens to an unfortunate investor in need of spare tokens. Ex. donate @IndyKumaz 322n\n\n
+    $redeem <type> <peepo>\n
+      - type = 1\n 
+        Give a decree to your lovely wimpy goach to entertain peepos as a player. Ex redeem 1 @The Look Jork#7812\n
+        (cost 20000 tokens)\n
+      - type = 2\n
+        Give a decree to your kawaii friend to play a chosen hero such as Meepo, in order to be the real hero!!!. Ex redeem 2 @The Look Jork#7812\n
+        (cost 10000 tokens)\n
+        #PS: SHAME to those who don't abide by the decree.
+    ''',
                     destroy=True,
                     delay=60.0)
     await discord.Message.delete(ctx.message, delay=4.0)
 
+async def bot_redeem_1(ctx: commands.Context, num, coach: discord.Member):
+    redemption_cost = [20000,10000] #redemption cost for each redemption type
+    required_cost = redemption_cost[num]
+    if user_in_database(user):
+        user_token = user_current_tokens(user)
+        if user_token < required_cost :
+            await print_msg(bot, 'You should have at least {0} token for such an invaluable redemption ;)'.format(required_cost))
+        else:
+            await add_user_token(ctx.author, -required_cost)
+    else:
+        await print_msg(bot, '{0} has not registered in the system yet.'.format(user))       
 
 async def bot_current(ctx: commands.Context, bot: commands.Bot):
     user = ctx.author
