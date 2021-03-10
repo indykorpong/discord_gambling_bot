@@ -252,7 +252,6 @@ async def bot_duel(ctx: commands.Context, bot: commands.Bot, user: discord.Membe
         await print_msg(bot, 'Cannot duel with {0} because they are not in the system.'.format(user))
     else:
         try:
-            print(tokens)
             valid_challenger_amount = await validate_token_amount(bot, str(tokens), ctx.author, False)
             valid_challengee_amount = await validate_token_amount(bot, str(tokens), challengee, False)
             valid_duel = False
@@ -261,13 +260,15 @@ async def bot_duel(ctx: commands.Context, bot: commands.Bot, user: discord.Membe
                 valid_duel = True
             elif tokens.lower() == 'all':
                 duel_amount = user_current_tokens(ctx.author)
-                valid_challengee_amount = validate_token_amount(bot, str(duel_amount), challengee)
+                valid_challengee_amount = await validate_token_amount(bot, str(duel_amount), challengee)
                 if not valid_challengee_amount:
                     await print_msg(bot, 'Your challengee does not have enough tokens to duel.')
             elif not valid_challenger_amount:
-                await print_msg(bot, 'You do not have enough tokens to duel or you inserted an invalid amount of tokens.')
+                await print_msg(bot,
+                                'You do not have enough tokens to duel or you inserted an invalid amount of tokens.')
             elif not valid_challengee_amount:
-                await print_msg(bot, 'Your challengee does not have enough tokens to duel or you inserted an invalid amount of tokens.')
+                await print_msg(bot,
+                                'Your challengee does not have enough tokens to duel or you inserted an invalid amount of tokens.')
 
             if valid_duel:
                 duel_dict[challengee] = [str(ctx.author), duel_amount]
@@ -311,6 +312,8 @@ async def wait_for_users(bot: commands.Bot):
     if bot_user is None:
         await user_apply(bot.user, bot, True)
     while True:
+        await asyncio.sleep(60)
+
         voice_channels = get_voice_channels(bot)
         if voice_channels is not None:
             for vc in voice_channels:
@@ -327,7 +330,6 @@ async def wait_for_users(bot: commands.Bot):
                         record_log('{0} is not in database or not in compatible voice condition'.format(user))
 
         add_user_token_by_id(bot_id, token_over_time)
-        await asyncio.sleep(60)
 
 
 async def validate_bet_state(bot: commands.Bot, user):
