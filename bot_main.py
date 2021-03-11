@@ -68,18 +68,18 @@ async def bot_help(ctx: commands.Context, bot: commands.Bot):
       - Open a gamba game that can lead you into bankruptcy. Normally a gamba game will open for 6 mins before it’s closed unless bet_close command is issued.\n\n
     $bet_close\n
       - You can use this command to manually close a gamba game and wait for a privileged dude to announce the result.\n\n
-    $bet <bet_result> <token_amount/all>\n
-      - Choose to become believers or doubters with some tokens that can motivate players’ movement in game. (<bet_result> includes win, loss, lose) Ex. bet loss all \n\n
-    $result <bet_result>\n
-      - For privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. result loss\n\n
-    $donate <donatee> <token_amount/all>\n 
-      - Donate your tokens to an unfortunate investor in need of spare tokens. Ex. donate @IndyKumaz 322n\n\n
-    $redeem <type> <peepo>\n
-      - type = 1\n 
-        Give a decree to your lovely wimpy goach to entertain peepos as a player. Ex redeem 1 @The Look Jork#7812\n
+    $bet [bet_result] [token_amount/all]\n
+      - Choose to become believers or doubters with some tokens that can motivate players’ movement in game. (<bet_result> includes win, loss, lose) Ex. $bet loss all \n\n
+    $result [bet_result]\n
+      - For privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. $result loss\n\n
+    $donate [donatee] [token_amount/all]\n 
+      - Donate your tokens to an unfortunate investor in need of spare tokens. Ex. $donate @IndyKuma#5444 322n\n\n
+    $redeem [peepo] [redeem_type] [hero's name/role]\n
+      - redeem_type = coach\n 
+        Give a decree to your lovely wimpy coach to entertain peepos as a player. Ex. $redeem @The Look Jork#7812 coach\n
         (cost 20000 tokens)\n
-      - type = 2\n
-        Give a decree to your kawaii friend to play a chosen hero such as Meepo, in order to be the real hero!!!. Ex redeem 2 @The Look Jork#7812\n
+      - redeem_type = hero\n
+        Give a decree to your kawaii friend to play a chosen hero such as Meepo, in order to be the real hero!!!. Ex. $redeem @The Look Jork#7812 hero Meepo\n
         (cost 10000 tokens)\n
         #PS: SHAME to those who don't abide by the decree.
     ''',
@@ -87,17 +87,41 @@ async def bot_help(ctx: commands.Context, bot: commands.Bot):
                     delay=60.0)
     await discord.Message.delete(ctx.message, delay=4.0)
 
-async def bot_redeem_1(ctx: commands.Context, num, coach: discord.Member):
-    redemption_cost = [20000,10000] #redemption cost for each redemption type
-    required_cost = redemption_cost[num]
+
+async def bot_redeem(ctx: commands.Context, bot: commands.Bot, member: discord.Member, *args):
+    # redemption_cost = [0, 20000, 10000]  # redemption cost for each redemption type
+    redemption_cost = [0, 20, 10]  # redemption cost for each redemption type "for testing"
+    redeem_type = 0
+    if args[0] == 'coach':
+        redeem_type = 1
+    if args[0] == 'hero':
+        redeem_type = 2
+    required_cost = redemption_cost[redeem_type]
+    user = ctx.author
     if user_in_database(user):
         user_token = user_current_tokens(user)
-        if user_token < required_cost :
-            await print_msg(bot, 'You should have at least {0} token for such an invaluable redemption ;)'.format(required_cost))
+        if user_token < required_cost:
+            await print_msg(bot, 'You should have at least {0} token for such an invaluable redemption. ;)'.format(
+                required_cost))
         else:
-            await add_user_token(ctx.author, -required_cost)
+            valid_redeem = False
+            if args[0] == 'coach':
+                await print_msg(bot, '{0} has redeemed {1} tokens to force {2} to become a player.'.format(user, required_cost, member), destroy=False)
+                valid_redeem = True
+            if args[0] == 'hero':
+                try:
+                    await print_msg(bot, '{0} has redeemed {1} tokens to force {2} to pick {3}'.format(user, required_cost, member, args[1]), destroy=False)
+                    valid_redeem = True
+                except IndexError:
+                    await print_msg(bot, 'You have not selected the hero for {0} to pick.'.format(member))
+            else:
+                await print_msg(bot, 'You have inserted the invalid redeem type.')
+
+            if valid_redeem:
+                await add_user_token(ctx.author, -required_cost)
     else:
-        await print_msg(bot, '{0} has not registered in the system yet.'.format(user))       
+        await print_msg(bot, '{0} has not registered in the system yet.'.format(user))
+
 
 async def bot_current(ctx: commands.Context, bot: commands.Bot):
     user = ctx.author

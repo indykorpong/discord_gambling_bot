@@ -11,7 +11,7 @@ async def on_ready():
     print(bot.user.name)
     print(bot.user.id)
     print('------')
-    await print_msg(bot, 'IndyBot has come online!', destroy=True, delay=60)
+    await print_msg(bot, 'IndyBot has come online!', destroy=True, delay=30.0)
     await wait_for_users(bot)
 
 
@@ -58,8 +58,8 @@ async def donate(ctx: commands.Context, donatee: discord.Member, donate_amount):
 
 
 @bot.command()
-async def redeem_1(ctx: commands.Context, coach: discord.Member,):
-#
+async def redeem(ctx: commands.Context, member: discord.Member, *args):
+    await bot_redeem(ctx, bot, member, *args)
 
 
 @bot.command()
