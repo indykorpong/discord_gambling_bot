@@ -69,11 +69,17 @@ async def bot_help(ctx: commands.Context, bot: commands.Bot):
     $bet_close\n
       - You can use this command to manually close a gamba game and wait for a privileged dude to announce the result.\n\n
     $bet <bet_result> <token_amount/all>\n
-      - Choose to become believers or doubters with some tokens that can motivate players’ movement in game. (<bet_result> includes win, loss, lose) Ex. bet loss all \n\n
+      - Choose to become believers or doubters with some tokens that can motivate players’ movement in game. (<bet_result> includes win, loss, lose) Ex. $bet loss all \n\n
     $result <bet_result>\n
-      - For privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. result loss\n\n
+      - For privileged dude only. Use this command to announce the match result and take all Investors' tokens. Ex. $result loss\n\n
     $donate <donatee> <token_amount/all>\n 
-      - Donate your tokens to an unfortunate investor in need of spare tokens. Ex. donate @IndyKumaz 322
+      - Donate your tokens to an unfortunate investor in need of spare tokens. Ex. $donate @IndyKumaz 322\n\n
+    $duel <your challengee> <token_amount/all>\n
+      - Issue a challenge to perform an honorable duel with your foe in which they can choose to accept or decline. The result will be randomly decided (coin toss) and the winner takes all. Ex. $duel @IndyKumaz all\n\n
+    $duel_accept\n
+      - Accept the duel from your most recent challenger, with your honor on the line.\n\n
+    $duel_decline\n
+      - Decline the duel from your most recent challenger, losing your entire life's worth of dignity (SHAME).
         ''',
                     destroy=True,
                     delay=60.0)
@@ -260,9 +266,14 @@ async def bot_duel(ctx: commands.Context, bot: commands.Bot, user: discord.Membe
                 valid_duel = True
             elif tokens.lower() == 'all':
                 duel_amount = user_current_tokens(ctx.author)
-                valid_challengee_amount = await validate_token_amount(bot, str(duel_amount), challengee)
-                if not valid_challengee_amount:
+                valid_challenger_amount = await validate_token_amount(bot, str(duel_amount), ctx.author, False)
+                valid_challengee_amount = await validate_token_amount(bot, str(duel_amount), challengee, False)
+                if not valid_challenger_amount:
+                    await print_msg(bot, 'You do not have enough tokens to duel.')
+                elif not valid_challengee_amount:
                     await print_msg(bot, 'Your challengee does not have enough tokens to duel.')
+                else:
+                    valid_duel = True
             elif not valid_challenger_amount:
                 await print_msg(bot,
                                 'You do not have enough tokens to duel or you inserted an invalid amount of tokens.')
@@ -301,6 +312,7 @@ async def bot_duel_accept(ctx: commands.Context, bot: commands.Bot):
 async def bot_duel_decline(ctx: commands.Context, bot: commands.Bot):
     if str(ctx.author) in duel_dict.keys():
         await print_msg(bot, '{0} has declined the duel'.format(ctx.author))
+        duel_dict.pop(str(ctx.author))
     else:
         await print_msg(bot, 'You have not been challenged.')
 

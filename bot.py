@@ -11,7 +11,7 @@ async def on_ready():
     print(bot.user.name)
     print(bot.user.id)
     print('------')
-    await print_msg(bot, 'IndyBot has come online!', destroy=True, delay=60)
+    await print_msg(bot, 'IndyBot has come online!', destroy=True, delay=30)
     await wait_for_users(bot)
 
 
