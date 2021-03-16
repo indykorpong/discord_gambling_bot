@@ -88,41 +88,6 @@ async def bot_help(ctx: commands.Context, bot: commands.Bot):
     await discord.Message.delete(ctx.message, delay=4.0)
 
 
-async def bot_redeem(ctx: commands.Context, bot: commands.Bot, member: discord.Member, *args):
-    # redemption_cost = [0, 20000, 10000]  # redemption cost for each redemption type
-    redemption_cost = [0, 20, 10]  # redemption cost for each redemption type "for testing"
-    redeem_type = 0
-    if args[0] == 'coach':
-        redeem_type = 1
-    if args[0] == 'hero':
-        redeem_type = 2
-    required_cost = redemption_cost[redeem_type]
-    user = ctx.author
-    if user_in_database(user):
-        user_token = user_current_tokens(user)
-        if user_token < required_cost:
-            await print_msg(bot, 'You should have at least {0} token for such an invaluable redemption. ;)'.format(
-                required_cost))
-        else:
-            valid_redeem = False
-            if args[0] == 'coach':
-                await print_msg(bot, '{0} has redeemed {1} tokens to force {2} to become a player.'.format(user, required_cost, member), destroy=False)
-                valid_redeem = True
-            if args[0] == 'hero':
-                try:
-                    await print_msg(bot, '{0} has redeemed {1} tokens to force {2} to pick {3}'.format(user, required_cost, member, args[1]), destroy=False)
-                    valid_redeem = True
-                except IndexError:
-                    await print_msg(bot, 'You have not selected the hero for {0} to pick.'.format(member))
-            else:
-                await print_msg(bot, 'You have inserted the invalid redeem type.')
-
-            if valid_redeem:
-                await add_user_token(ctx.author, -required_cost)
-    else:
-        await print_msg(bot, '{0} has not registered in the system yet.'.format(user))
-
-
 async def bot_current(ctx: commands.Context, bot: commands.Bot):
     user = ctx.author
     if user_in_database(user):
@@ -134,8 +99,8 @@ async def bot_current(ctx: commands.Context, bot: commands.Bot):
 
 
 async def bot_bet_open(bot: commands.Bot):
-    if not get_bet_opened() and not get_prediction_started():
-        set_bet_opened(True)
+    if not get_bet_open_state() and not get_prediction_state():
+        set_bet_open_state(True)
         set_prediction_state(True)
         bet_pool_dict['win'] = 0
         bet_pool_dict['lose'] = 0
@@ -147,21 +112,23 @@ async def bot_bet_open(bot: commands.Bot):
 
 
 async def bot_bet_close(bot: commands.Bot):
-    if get_bet_opened() and get_prediction_started():
-        set_bet_opened(False)
-        # Bot has to bet if there's no bet on one side (either win or lose).
+    if get_bet_open_state() and get_prediction_state():
+        set_bet_open_state(False)
+        # Bot has to bet if there's the prediction pool is unbalanced (either side has return ratio less than 1:1.1)
         bot_user = get_user_from_user_id(bot_id)
         bot_current_tokens = user_current_tokens(bot_user)
-        if bet_pool_dict['win'] == 0 and bet_pool_dict['lose'] > 0:
-            if bot_current_tokens >= bet_pool_dict['lose']:
-                await user_bet(bot_user, bot, 'win', bet_pool_dict['lose'])
+        lose_pool_diff = 0.1 * bet_pool_dict['lose'] - bet_pool_dict['win']
+        if lose_pool_diff > 0:
+            if bot_current_tokens >= lose_pool_diff:
+                await user_bet(bot_user, bot, 'win', lose_pool_diff, True)
             else:
-                await user_bet(bot_user, bot, 'win', bot_current_tokens)
-        if bet_pool_dict['lose'] == 0 and bet_pool_dict['win'] > 0:
-            if bot_current_tokens >= bet_pool_dict['win']:
-                await user_bet(bot_user, bot, 'lose', bet_pool_dict['win'])
+                await user_bet(bot_user, bot, 'win', bot_current_tokens, True)
+        win_pool_diff = 0.1 * bet_pool_dict['win'] - bet_pool_dict['lose']
+        if win_pool_diff > 0:
+            if bot_current_tokens >= win_pool_diff:
+                await user_bet(bot_user, bot, 'lose', win_pool_diff, True)
             else:
-                await user_bet(bot_user, bot, 'lose', bot_current_tokens)
+                await user_bet(bot_user, bot, 'lose', bot_current_tokens, True)
 
         await print_msg(bot, 'Bet phase has ended!')
         await print_bet_dict(bot)
@@ -169,12 +136,21 @@ async def bot_bet_close(bot: commands.Bot):
         await print_msg(bot, 'Prediction has not started yet. :(')
 
 
+async def bot_bet_reset(ctx: commands.Context, bot: commands.Bot):
+    if user_is_judge(ctx.author):
+        set_bet_open_state(False)
+        set_prediction_state(False)
+        await print_msg(bot, 'Bet state has been reset!')
+    else:
+        await print_msg(bot, 'Sorry, you do not have a permission to do that (have no prediction judge role). ¯\_(ツ)_/¯')
+
+
 async def bot_bet(ctx: commands.Context, bot: commands.Bot, bet_side, token):
-    if not get_prediction_started():
+    if not get_prediction_state():
         await print_msg(bot, 'Prediction has not started yet. :(')
         return
 
-    if not get_bet_opened() and get_prediction_started():
+    if not get_bet_open_state() and get_prediction_state():
         await print_msg(bot, 'Bet phase has already closed. :(')
         return
 
@@ -182,11 +158,11 @@ async def bot_bet(ctx: commands.Context, bot: commands.Bot, bet_side, token):
     await user_bet(user, bot, bet_side, token)
 
 
-async def user_bet(user: discord.Member, bot: commands.Bot, bet_side, token):
+async def user_bet(user: discord.Member, bot: commands.Bot, bet_side, token, is_bot=False):
     token_to_deduct = 0.0
     if user_in_database(user):
         try:
-            valid_number = await validate_token_amount(bot, str(token), user)
+            valid_number = await validate_token_amount(bot, str(token), user, printed=True, is_bot=is_bot)
             valid_bet_state = await validate_bet_state(bot, user)
 
             can_bet = False
@@ -219,7 +195,7 @@ async def user_bet(user: discord.Member, bot: commands.Bot, bet_side, token):
 
 
 async def bot_result(ctx: commands.Context, bot: commands.Bot, bet_result):
-    if not get_prediction_started():
+    if not get_prediction_state():
         await print_msg(bot, 'Prediction has not started yet. :(')
         return
 
@@ -245,14 +221,14 @@ async def bot_result(ctx: commands.Context, bot: commands.Bot, bet_result):
                     if _result == 'win':
                         add_user_token(user, float(bet_dict[user][BET_TOKEN] * win_ratio))
                         await print_msg(bot,
-                                        '{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * win_ratio))
+                                        '{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * win_ratio), destroy=False)
                     elif _result == 'loss':
                         add_user_token(user, float(bet_dict[user][BET_TOKEN] * loss_ratio))
                         await print_msg(bot,
-                                        '{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * loss_ratio))
+                                        '{0} has won {1} tokens.'.format(user, bet_dict[user][BET_TOKEN] * loss_ratio), destroy=False)
                 else:
-                    await print_msg(bot, '{0} has wasted {1} tokens.'.format(user, bet_dict[user][BET_TOKEN]))
-            set_bet_opened(False)
+                    await print_msg(bot, '{0} has wasted {1} tokens.'.format(user, bet_dict[user][BET_TOKEN]), destroy=False)
+            set_bet_open_state(False)
             set_prediction_state(False)
             bet_dict.clear()
             bet_pool_dict.clear()
@@ -354,6 +330,49 @@ async def bot_duel_decline(ctx: commands.Context, bot: commands.Bot):
         await print_msg(bot, 'You have not been challenged.')
 
 
+async def bot_redeem(ctx: commands.Context, bot: commands.Bot, member: discord.Member, *args):
+    redemption_cost = [0, 20000, 10000]  # redemption cost for each redemption type
+    # redemption_cost = [0, 20, 10]  # redemption cost for each redemption type "for testing"
+    redeem_type = 0
+    if args[0] == 'coach':
+        redeem_type = 1
+    if args[0] == 'hero':
+        redeem_type = 2
+    required_cost = redemption_cost[redeem_type]
+    user = ctx.author
+    if user_in_database(user):
+        user_token = user_current_tokens(user)
+        if user_token < required_cost:
+            await print_msg(bot,
+                            'You should have at least {0} token for such an invaluable redemption. ;)'.format(
+                                required_cost))
+        else:
+            valid_redeem = False
+            if args[0] == 'coach':
+                await print_msg(bot, '{0} has redeemed {1} tokens to force {2} to become a player.'.format(user,
+                                                                                                           required_cost,
+                                                                                                           member),
+                                destroy=False)
+                valid_redeem = True
+            elif args[0] == 'hero':
+                try:
+                    await print_msg(bot, '{0} has redeemed {1} tokens to force {2} to pick {3}'.format(user,
+                                                                                                       required_cost,
+                                                                                                       member,
+                                                                                                       args[1]),
+                                    destroy=False)
+                    valid_redeem = True
+                except IndexError:
+                    await print_msg(bot, 'You have not selected the hero for {0} to pick.'.format(member))
+            else:
+                await print_msg(bot, 'You have inserted the invalid redeem type.')
+
+            if valid_redeem:
+                add_user_token(user, -required_cost)
+    else:
+        await print_msg(bot, '{0} has not registered in the system yet.'.format(user))
+
+
 # Helper asynchronous methods
 async def wait_for_users(bot: commands.Bot):
     # If the bot has not applied for the system yet, then let the bot apply.
@@ -375,10 +394,10 @@ async def wait_for_users(bot: commands.Bot):
                             not user.voice.deaf):
                         add_user_token(user, token_over_time)
                         await print_msg(bot, '{0} got {1} more tokens!'.format(user, token_over_time))
-                    else:
-                        record_log('{0} is not in database or not in compatible voice condition'.format(user))
+                    # else:
+                    #     record_log('{0} is not in database or not in compatible voice condition'.format(user))
 
-        add_user_token_by_id(bot_id, token_over_time)
+        add_user_token_by_id(bot_id, get_users_count() * token_over_time)
 
 
 async def validate_bet_state(bot: commands.Bot, user):

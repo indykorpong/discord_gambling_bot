@@ -27,10 +27,14 @@ async def print_msg(bot: commands.Bot, msg, destroy=True, delay=5.0):
         await message.delete(delay=delay)
 
 
-async def validate_token_amount(bot: commands.Bot, string: str, user, printed=True):
+async def validate_token_amount(bot: commands.Bot, string: str, user, printed=True, is_bot=False):
+    if is_bot:
+        min_tokens_to_bet = 0
+    else:
+        min_tokens_to_bet = min_bet_tokens
     try:
         number = float(string)
-        if min_bet_tokens <= number <= user_current_tokens(user):
+        if min_tokens_to_bet <= number <= user_current_tokens(user):
             return True
         else:
             if printed:
@@ -137,7 +141,7 @@ def user_is_judge(user):
     return False
 
 
-def get_bet_opened():
+def get_bet_open_state():
     with open(bet_filename, 'r') as f:
         lines = f.readlines()
         bet_opened = lines[0].strip('\n')
@@ -150,7 +154,7 @@ def get_bet_opened():
             return None
 
 
-def set_bet_opened(value):
+def set_bet_open_state(value):
     with open(bet_filename, 'r') as f:
         lines = f.readlines()
         tmp = lines[1].strip('\n')
@@ -166,7 +170,7 @@ def set_bet_opened(value):
             record_log('Invalid bet_opened value!')
 
 
-def get_prediction_started():
+def get_prediction_state():
     with open(bet_filename, 'r') as f:
         lines = f.readlines()
         prediction_state = lines[1].strip('\n')
@@ -193,3 +197,9 @@ def set_prediction_state(value):
                 f.write('0\n')
         except ValueError:
             record_log('Invalid bet_opened value!')
+
+
+def get_users_count():
+    with open(data_filename, 'r') as f:
+        lines = f.readlines()
+        return len(lines)

@@ -43,6 +43,11 @@ async def bet_close(ctx: commands.Context):
 
 
 @bot.command()
+async  def bet_reset(ctx:commands.Context):
+    await bot_bet_reset(ctx, bot)
+
+
+@bot.command()
 async def bet(ctx: commands.Context, bet_side, token):
     await bot_bet(ctx, bot, bet_side, token)
 
@@ -55,11 +60,6 @@ async def result(ctx: commands.Context, bet_result):
 @bot.command()
 async def donate(ctx: commands.Context, donatee: discord.Member, donate_amount):
     await bot_donate(ctx, bot, donatee, donate_amount)
-
-
-@bot.command()
-async def redeem(ctx: commands.Context, member: discord.Member, *args):
-    await bot_redeem(ctx, bot, member, *args)
 
 
 @bot.command()
@@ -76,9 +76,11 @@ async def duel_accept(ctx: commands.Context):
 async def duel_decline(ctx: commands.Context):
     await bot_duel_decline(ctx, bot)
 
+
 @bot.command()
-async def redeem(ctx: commands.Context, num, coach: discord.Member):
-    await bot_redeem()
+async def redeem(ctx: commands.Context, member: discord.Member, *args):
+    await bot_redeem(ctx, bot, member, *args)
+
 
 # Synchronous methods
 
