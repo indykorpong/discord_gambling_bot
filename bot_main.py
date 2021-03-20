@@ -114,21 +114,21 @@ async def bot_bet_open(bot: commands.Bot):
 async def bot_bet_close(bot: commands.Bot):
     if get_bet_open_state() and get_prediction_state():
         set_bet_open_state(False)
-        # Bot has to bet if there's the prediction pool is unbalanced (either side has return ratio less than 1:1.1)
-        bot_user = get_user_from_user_id(bot_id)
-        bot_current_tokens = user_current_tokens(bot_user)
-        lose_pool_diff = 0.1 * bet_pool_dict['lose'] - bet_pool_dict['win']
-        if lose_pool_diff > 0:
-            if bot_current_tokens >= lose_pool_diff:
-                await user_bet(bot_user, bot, 'win', lose_pool_diff, True)
-            else:
-                await user_bet(bot_user, bot, 'win', bot_current_tokens, True)
-        win_pool_diff = 0.1 * bet_pool_dict['win'] - bet_pool_dict['lose']
-        if win_pool_diff > 0:
-            if bot_current_tokens >= win_pool_diff:
-                await user_bet(bot_user, bot, 'lose', win_pool_diff, True)
-            else:
-                await user_bet(bot_user, bot, 'lose', bot_current_tokens, True)
+        # # Bot has to bet if there's the prediction pool is unbalanced (either side has return ratio less than 1:1.1)
+        # bot_user = get_user_from_user_id(bot_id)
+        # bot_current_tokens = user_current_tokens(bot_user)
+        # lose_pool_diff = 0.1 * bet_pool_dict['lose'] - bet_pool_dict['win']
+        # if lose_pool_diff > 0:
+        #     if bot_current_tokens >= lose_pool_diff:
+        #         await user_bet(bot_user, bot, 'win', lose_pool_diff, True)
+        #     else:
+        #         await user_bet(bot_user, bot, 'win', bot_current_tokens, True)
+        # win_pool_diff = 0.1 * bet_pool_dict['win'] - bet_pool_dict['lose']
+        # if win_pool_diff > 0:
+        #     if bot_current_tokens >= win_pool_diff:
+        #         await user_bet(bot_user, bot, 'lose', win_pool_diff, True)
+        #     else:
+        #         await user_bet(bot_user, bot, 'lose', bot_current_tokens, True)
 
         await print_msg(bot, 'Bet phase has ended!')
         await print_bet_dict(bot)
@@ -160,24 +160,27 @@ async def bot_bet(ctx: commands.Context, bot: commands.Bot, bet_side, token):
 
 async def user_bet(user: discord.Member, bot: commands.Bot, bet_side, token, is_bot=False):
     token_to_deduct = 0.0
+    token_to_bet = 0.0
     if user_in_database(user):
         try:
-            valid_number = await validate_token_amount(bot, str(token), user, printed=True, is_bot=is_bot)
+            valid_number = await validate_token_amount(bot, str(token), user, printed=True, is_bot=is_bot, has_fee=True)
             valid_bet_state = await validate_bet_state(bot, user)
 
             can_bet = False
             if valid_number and valid_bet_state:
-                token_to_deduct = float(token)
+                token_to_bet = float(token)
+                token_to_deduct = float(token) + bet_fee
                 can_bet = True
             elif not valid_number and valid_bet_state:
                 if token.lower() == 'all':
+                    token_to_bet = user_current_tokens(user) - bet_fee
                     token_to_deduct = user_current_tokens(user)
                     can_bet = True
 
             if can_bet:
                 if bet_side.lower() == 'win':
-                    bet_dict[str(user)] = ('win', token_to_deduct, True)
-                    bet_pool_dict['win'] += token_to_deduct
+                    bet_dict[str(user)] = ('win', token_to_bet, True)
+                    bet_pool_dict['win'] += token_to_bet
                     add_user_token(user, -token_to_deduct)
                     await print_msg(bot, '{0} has chosen to be the believers!'.format(user))
                 elif bet_side.lower() == 'loss' or bet_side.lower() == 'lose':
@@ -200,10 +203,12 @@ async def bot_result(ctx: commands.Context, bot: commands.Bot, bet_result):
         return
 
     user = ctx.author
-    win_ratio = (bet_pool_dict['win'] + bet_pool_dict['lose']) / bet_pool_dict['win']
-    loss_ratio = (bet_pool_dict['win'] + bet_pool_dict['lose']) / bet_pool_dict['lose']
-    record_log('Win ratio is 1 : {0}.'.format(win_ratio))
-    record_log('Loss ratio is 1 : {0}.'.format(loss_ratio))
+    # win_ratio = (bet_pool_dict['win'] + bet_pool_dict['lose']) / bet_pool_dict['win']
+    # loss_ratio = (bet_pool_dict['win'] + bet_pool_dict['lose']) / bet_pool_dict['lose']
+    # record_log('Win ratio is 1 : {0}.'.format(win_ratio))
+    # record_log('Loss ratio is 1 : {0}.'.format(loss_ratio))
+    win_ratio = 2
+    loss_ratio = 2
 
     if user_is_judge(user):
         try:

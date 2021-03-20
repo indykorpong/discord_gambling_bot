@@ -14,6 +14,7 @@ text_channel_id = 258601727261933568
 judge_role_id = 813266595291463680
 
 min_bet_tokens = 10
+bet_fee = 10.0
 
 
 # Miscellaneous methods that is widely used in this project will be implemented below.
@@ -27,13 +28,18 @@ async def print_msg(bot: commands.Bot, msg, destroy=True, delay=5.0):
         await message.delete(delay=delay)
 
 
-async def validate_token_amount(bot: commands.Bot, string: str, user, printed=True, is_bot=False):
+async def validate_token_amount(bot: commands.Bot, string: str, user, printed=True, is_bot=False, has_fee=False):
     if is_bot:
         min_tokens_to_bet = 0
     else:
         min_tokens_to_bet = min_bet_tokens
+
     try:
-        number = float(string)
+        if has_fee:
+            number= float(string) + bet_fee
+        else:
+            number = float(string)
+
         if min_tokens_to_bet <= number <= user_current_tokens(user):
             return True
         else:
@@ -71,17 +77,26 @@ def record_log(msg):
 
 
 def user_in_database(user):
-    with open(data_filename, 'r') as f:
-        for line in f:
-            line = line.strip(' \n')
-            if ':' in line:
-                line_user, line_user_id, line_token = line.split(':')
-                if str(line_user) == str(user):
-                    return True
-    return False
+    if not os.path.exists(data_filename):
+        with open(data_filename, 'w') as f:
+            f.write('')
+            return False
+    else:
+        with open(data_filename, 'r') as f:
+            for line in f:
+                line = line.strip(' \n')
+                if ':' in line:
+                    line_user, line_user_id, line_token = line.split(':')
+                    if str(line_user) == str(user):
+                        return True
+        return False
 
 
 def add_user_token(user, token):
+    if not os.path.exists(data_filename):
+        with open(data_filename, 'w') as f:
+            f.write('')
+
     with open(data_filename, 'r') as f:
         lines = f.readlines()
 
@@ -97,6 +112,11 @@ def add_user_token(user, token):
 
 
 def add_user_token_by_id(user_id, token):
+    if not os.path.exists(data_filename):
+        with open(data_filename, 'w') as f:
+            f.write('')
+            return
+
     with open(data_filename, 'r') as f:
         lines = f.readlines()
 
@@ -112,6 +132,11 @@ def add_user_token_by_id(user_id, token):
 
 
 def get_user_from_user_id(user_id):
+    if not os.path.exists(data_filename):
+        with open(data_filename, 'w') as f:
+            f.write('')
+            return None
+
     with open(data_filename, 'r') as f:
         for line in f:
             line = line.strip(' \n')
@@ -124,6 +149,10 @@ def get_user_from_user_id(user_id):
 
 def user_current_tokens(user):
     tokens = 0
+    if not os.path.exists(data_filename):
+        with open(data_filename, 'w') as f:
+            f.write('')
+
     with open(data_filename, 'r') as f:
         for line in f:
             line = line.strip(' \n')
@@ -142,6 +171,10 @@ def user_is_judge(user):
 
 
 def get_bet_open_state():
+    if not os.path.exists(bet_filename):
+        with open(bet_filename, 'w') as f:
+            f.write('0\n0\n')
+
     with open(bet_filename, 'r') as f:
         lines = f.readlines()
         bet_opened = lines[0].strip('\n')
@@ -155,6 +188,10 @@ def get_bet_open_state():
 
 
 def set_bet_open_state(value):
+    if not os.path.exists(bet_filename):
+        with open(bet_filename, 'w') as f:
+            f.write('0\n0\n')
+
     with open(bet_filename, 'r') as f:
         lines = f.readlines()
         tmp = lines[1].strip('\n')
@@ -171,6 +208,10 @@ def set_bet_open_state(value):
 
 
 def get_prediction_state():
+    if not os.path.exists(bet_filename):
+        with open(bet_filename, 'w') as f:
+            f.write('0\n0\n')
+
     with open(bet_filename, 'r') as f:
         lines = f.readlines()
         prediction_state = lines[1].strip('\n')
@@ -184,6 +225,10 @@ def get_prediction_state():
 
 
 def set_prediction_state(value):
+    if not os.path.exists(bet_filename):
+        with open(bet_filename, 'w') as f:
+            f.write('0\n0\n')
+
     with open(bet_filename, 'r') as f:
         lines = f.readlines()
         tmp = lines[0]
@@ -200,6 +245,10 @@ def set_prediction_state(value):
 
 
 def get_users_count():
+    if not os.path.exists(data_filename):
+        with open(data_filename, 'w') as f:
+            f.write('')
+
     with open(data_filename, 'r') as f:
         lines = f.readlines()
         return len(lines)
