@@ -1,2 +1,3 @@
 # Discord-betting-bot
-Discord betting bot which is similar to prediction system on Twitch
+
+Discord betting bot lets Discord users in the same server to create gambling events to make predictions on the result of another event.
